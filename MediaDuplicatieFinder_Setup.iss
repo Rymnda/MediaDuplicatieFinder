@@ -12,13 +12,13 @@ DisableProgramGroupPage=yes
 LicenseFile=LICENSE
 OutputDir=installer
 OutputBaseFilename=MediaDuplicatieFinder_Setup
-SetupIconFile=icon.ico
+SetupIconFile=assets\icon.ico
 UninstallDisplayIcon={app}\MediaDuplicatieFinder.exe
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
-WizardImageFile=Logo_background.jpg
-WizardSmallImageFile=Logo_background.jpg
+WizardImageFile=assets\installer_wizard.bmp
+WizardSmallImageFile=assets\installer_wizard_small.bmp
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 ArchitecturesAllowed=x64compatible
@@ -35,7 +35,8 @@ Name: "spanish"; MessagesFile: "compiler:Languages\Spanish.isl"
 Name: "desktopicon"; Description: "Create a desktop shortcut"; Flags: unchecked
 
 [Files]
-Source: "dist\MediaDuplicatieFinder\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "dist\MediaDuplicatieFinder.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "dist\_internal\*"; DestDir: "{app}\_internal"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\Media Duplicatie Finder"; Filename: "{app}\MediaDuplicatieFinder.exe"

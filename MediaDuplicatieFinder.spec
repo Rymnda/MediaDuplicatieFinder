@@ -10,13 +10,13 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=[
-        ('check_white.svg', '.'),
+        ('assets\\check_white.svg', 'assets'),
         ('lang', 'lang'),
-        ('background.jpg', '.'),
-        ('BG.png', '.'),
-        ('logo_flat.png', '.'),
-        ('intro.mp4', '.'),
-        ('Intro_about.mp4', '.'),
+        ('assets\\background.jpg', 'assets'),
+        ('assets\\BG.png', 'assets'),
+        ('assets\\logo_flat.png', 'assets'),
+        ('assets\\intro.mp4', 'assets'),
+        ('assets\\Intro_about.mp4', 'assets'),
     ],
     hiddenimports=[],
     hookspath=[],
@@ -63,7 +63,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['icon.ico'],
+    icon=['assets\\icon.ico'],
 )
 coll = COLLECT(
     exe,

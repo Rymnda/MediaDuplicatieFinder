@@ -13,7 +13,7 @@ Desktop app for finding duplicate videos and photos on Windows.
 - language selection via `lang/*.json`
 - intro video on startup with on/off setting
 - video-based About window
-- custom background, icon, and header logo assets
+- custom assets from `assets/`
 
 ## Supported Languages
 
@@ -43,18 +43,10 @@ python .\MediaDuplicatieFinder.py
 Use the GitHub Actions workflow or run PyInstaller manually:
 
 ```powershell
-python -m pip install -r requirements.txt
-python -m pip install pyinstaller
-pyinstaller --noconfirm --windowed --name "MediaDuplicatieFinder" --add-data "check_white.svg;." --add-data "lang;lang" MediaDuplicatieFinder.py
+C:\Users\ansem\Documents\Github\_venvs\venv_cuda_py310_np2\Scripts\python.exe -m PyInstaller --clean MediaDuplicatieFinder.spec
 ```
 
-The build output will be placed in `dist\MediaDuplicatieFinder\`.
-
-To include the current visual/media assets in the build, use:
-
-```powershell
-pyinstaller --noconfirm --windowed --name "MediaDuplicatieFinder" --icon "icon.ico" --add-data "check_white.svg;." --add-data "lang;lang" --add-data "BG.png;." --add-data "logo_flat.png;." --add-data "intro.mp4;." --add-data "Intro_about.mp4;." MediaDuplicatieFinder.py
-```
+The build output will be placed in `dist\`.
 
 ## GitHub Repository Contents
 
@@ -64,12 +56,7 @@ Recommended files for the repository:
 - `requirements.txt`
 - `README.md`
 - `.gitignore`
-- `BG.png`
-- `check_white.svg`
-- `icon.ico`
-- `logo_flat.png`
-- `intro.mp4`
-- `Intro_about.mp4`
+- `assets/`
 - `lang/`
 - `LICENSE`
 - `.github/workflows/build-windows.yml`
@@ -82,7 +69,7 @@ After pushing to GitHub, the workflow automatically builds a Windows artifact wi
 
 - A license file is already included in this repository.
 - If you also want to publish an installer, you can add Inno Setup later.
-- If you update the visual assets, make sure your PyInstaller command or workflow includes them via `--add-data`.
+- If you update visual or media files, keep them in `assets/`.
 
 ## Author
 

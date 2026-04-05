@@ -146,7 +146,11 @@ def load_translations(code: str) -> Dict[str, str]:
 
 
 def resource_path(name: str) -> str:
-    return os.path.join(os.path.dirname(os.path.abspath(__file__)), name)
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    asset_path = os.path.join(base_dir, "assets", name)
+    if os.path.exists(asset_path):
+        return asset_path
+    return os.path.join(base_dir, name)
 
 
 class WatermarkWidget(QtWidgets.QWidget):
@@ -655,7 +659,8 @@ class DarkPalette:
     @staticmethod
     def stylesheet() -> str:
         base_dir = os.path.dirname(os.path.abspath(__file__))
-        check_svg_path = os.path.join(base_dir, "check_white.svg")
+        assets_dir = os.path.join(base_dir, "assets")
+        check_svg_path = os.path.join(assets_dir, "check_white.svg")
 
         if not os.path.exists(check_svg_path):
             svg_data = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
@@ -664,7 +669,8 @@ class DarkPalette:
 </svg>
 """
             try:
-                check_svg_path = os.path.join(base_dir, "check_white.svg")
+                os.makedirs(assets_dir, exist_ok=True)
+                check_svg_path = os.path.join(assets_dir, "check_white.svg")
                 with open(check_svg_path, "w", encoding="utf-8") as f:
                     f.write(svg_data.strip() + "\n")
             except OSError:
