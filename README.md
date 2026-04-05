@@ -12,6 +12,16 @@ Desktop app for finding duplicate videos and photos on Windows.
 - delete selected files to the Windows Recycle Bin
 - language selection via `lang/*.json`
 
+## Supported Languages
+
+- English
+- Nederlands
+- Español
+- Français
+- Deutsch
+
+On first launch the app defaults to English. After that, the last selected language is remembered.
+
 ## Requirements
 
 - Python 3.10+
