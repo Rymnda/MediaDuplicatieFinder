@@ -2,6 +2,8 @@
 
 Desktop app for finding duplicate videos and photos on Windows.
 
+![Media Duplicatie Finder screenshot](assets/MediaDuplicatieFinder_screenshot.jpg)
+
 ## Features
 
 - find duplicate videos using thumbnail/perceptual hash and duration comparison
