@@ -9,6 +9,7 @@
   "action_scripts": "Scripts en modules",
   "action_recurse_video": "Video: submappen standaard meenemen",
   "action_recurse_photo": "Foto: submappen standaard meenemen",
+  "action_play_intro": "Intro afspelen bij opstarten",
   "tab_video": "Video-dubbelen",
   "tab_photo": "Foto-dubbelen",
   "footer_ready": "Klaar",

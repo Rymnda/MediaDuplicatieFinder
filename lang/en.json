@@ -9,6 +9,7 @@
   "action_scripts": "Scripts and modules",
   "action_recurse_video": "Video: include subfolders by default",
   "action_recurse_photo": "Photo: include subfolders by default",
+  "action_play_intro": "Play intro on startup",
   "tab_video": "Video duplicates",
   "tab_photo": "Photo duplicates",
   "footer_ready": "Ready",

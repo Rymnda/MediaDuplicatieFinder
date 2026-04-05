@@ -9,6 +9,7 @@
   "action_scripts": "Scripts et modules",
   "action_recurse_video": "Vidéo : inclure les sous-dossiers par défaut",
   "action_recurse_photo": "Photo : inclure les sous-dossiers par défaut",
+  "action_play_intro": "Lire l'intro au démarrage",
   "tab_video": "Doublons vidéo",
   "tab_photo": "Doublons photo",
   "footer_ready": "Prêt",

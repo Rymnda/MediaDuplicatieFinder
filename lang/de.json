@@ -9,6 +9,7 @@
   "action_scripts": "Skripte und Module",
   "action_recurse_video": "Video: Unterordner standardmäßig einbeziehen",
   "action_recurse_photo": "Foto: Unterordner standardmäßig einbeziehen",
+  "action_play_intro": "Intro beim Start abspielen",
   "tab_video": "Videoduplikate",
   "tab_photo": "Fotoduplikate",
   "footer_ready": "Bereit",

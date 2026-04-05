@@ -22,6 +22,7 @@ from PIL import Image
 import imagehash
 try:
     from PySide6 import QtCore, QtGui, QtWidgets
+    from PySide6 import QtMultimedia, QtMultimediaWidgets
 except ImportError as e:
     print(f"CRITICAL: Ontbrekende modules in actieve omgeving.\nFout: {e}")
     print("Gebruik bijvoorbeeld: pip install pyside6 pillow imagehash numpy")
@@ -50,6 +51,7 @@ APP_SETTINGS_NAME = "Media Duplicatie Finder 2026"
 SET_KEY_LAST_VIDEO = "last_root_video"
 SET_KEY_LAST_PHOTO = "last_root_photo"
 SET_KEY_LANGUAGE = "ui_language"
+SET_KEY_PLAY_INTRO = "play_intro_on_startup"
 VIDEO_EXTS = {".mp4", ".mkv", ".mov", ".avi", ".webm", ".m4v"}
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff", ".gif"}
 DEFAULT_LANGUAGE_OPTIONS = [
@@ -70,6 +72,7 @@ DEFAULT_TRANSLATIONS = {
     "action_scripts": "Scripts and modules",
     "action_recurse_video": "Video: include subfolders by default",
     "action_recurse_photo": "Photo: include subfolders by default",
+    "action_play_intro": "Play intro on startup",
     "tab_video": "Video duplicates",
     "tab_photo": "Photo duplicates",
     "footer_ready": "Ready",
@@ -140,6 +143,217 @@ def load_translations(code: str) -> Dict[str, str]:
         except Exception:
             pass
     return translations
+
+
+def resource_path(name: str) -> str:
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), name)
+
+
+class WatermarkWidget(QtWidgets.QWidget):
+    def __init__(self, image_path: str, parent=None):
+        super().__init__(parent)
+        self._pixmap = QtGui.QPixmap(image_path) if os.path.exists(image_path) else QtGui.QPixmap()
+
+    def paintEvent(self, event: QtGui.QPaintEvent) -> None:
+        super().paintEvent(event)
+        if self._pixmap.isNull():
+            return
+
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.SmoothPixmapTransform, True)
+        painter.setOpacity(0.1)
+
+        available = self.rect().adjusted(24, 24, -24, -24)
+        scaled = self._pixmap.scaled(
+            available.size(),
+            QtCore.Qt.KeepAspectRatio,
+            QtCore.Qt.SmoothTransformation,
+        )
+        x = available.x() + (available.width() - scaled.width()) // 2
+        y = available.y() + (available.height() - scaled.height()) // 2
+        painter.drawPixmap(x, y, scaled)
+
+
+class IntroDialog(QtWidgets.QDialog):
+    def __init__(self, video_path: str, icon_path: str, parent=None):
+        super().__init__(parent)
+        self.setWindowFlags(
+            QtCore.Qt.Dialog
+            | QtCore.Qt.FramelessWindowHint
+            | QtCore.Qt.WindowStaysOnTopHint
+        )
+        self.setAttribute(QtCore.Qt.WA_TranslucentBackground, True)
+        self.resize(960, 540)
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QtGui.QIcon(icon_path))
+
+        outer = QtWidgets.QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+
+        frame = QtWidgets.QFrame()
+        frame.setObjectName("introFrame")
+        frame.setStyleSheet(
+            "#introFrame { background: #050814; border: 1px solid #1d2a3e; border-radius: 24px; }"
+        )
+        inner = QtWidgets.QVBoxLayout(frame)
+        inner.setContentsMargins(0, 0, 0, 0)
+
+        self.video_widget = QtMultimediaWidgets.QVideoWidget()
+        self.video_widget.setStyleSheet("background: #050814; border-radius: 24px;")
+        inner.addWidget(self.video_widget)
+        outer.addWidget(frame)
+
+        self.audio_output = QtMultimedia.QAudioOutput(self)
+        self.audio_output.setMuted(False)
+        self.audio_output.setVolume(1.0)
+        self.player = QtMultimedia.QMediaPlayer(self)
+        self.player.setAudioOutput(self.audio_output)
+        self.player.setVideoOutput(self.video_widget)
+        self.player.mediaStatusChanged.connect(self._on_media_status_changed)
+        self.player.errorOccurred.connect(self._on_media_error)
+        self.player.durationChanged.connect(self._on_duration_changed)
+        self._stop_timer = QtCore.QTimer(self)
+        self._stop_timer.setSingleShot(True)
+        self._stop_timer.timeout.connect(self.accept)
+
+        if os.path.exists(video_path):
+            self.player.setSource(QtCore.QUrl.fromLocalFile(video_path))
+        else:
+            QtCore.QTimer.singleShot(10, self.accept)
+
+    def showEvent(self, event: QtGui.QShowEvent) -> None:
+        super().showEvent(event)
+        self._apply_round_mask()
+        QtCore.QTimer.singleShot(0, self._start)
+
+    def resizeEvent(self, event: QtGui.QResizeEvent) -> None:
+        super().resizeEvent(event)
+        self._apply_round_mask()
+
+    def _apply_round_mask(self):
+        path = QtGui.QPainterPath()
+        path.addRoundedRect(QtCore.QRectF(self.rect()), 24, 24)
+        region = QtGui.QRegion(path.toFillPolygon().toPolygon())
+        self.setMask(region)
+
+    def _start(self):
+        if self.player.source().isEmpty():
+            self.accept()
+            return
+        self.player.play()
+
+    def _on_media_status_changed(self, status):
+        if status == QtMultimedia.QMediaPlayer.EndOfMedia:
+            self.accept()
+        elif status == QtMultimedia.QMediaPlayer.InvalidMedia:
+            self.accept()
+
+    def _on_duration_changed(self, duration_ms: int):
+        if duration_ms > 0:
+            self._stop_timer.start(max(1, duration_ms // 2))
+
+    def _on_media_error(self, *_args):
+        self.accept()
+
+
+class AboutVideoDialog(QtWidgets.QDialog):
+    def __init__(self, video_path: str, icon_path: str, title_text: str, left_text: str, right_text: str, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Info / Over")
+        self.resize(960, 740)
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QtGui.QIcon(icon_path))
+
+        root = QtWidgets.QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+
+        frame = QtWidgets.QFrame()
+        frame.setObjectName("aboutVideoFrame")
+        frame.setStyleSheet(
+            "#aboutVideoFrame { background: #0b1120; border: 1px solid #1d2a3e; }"
+        )
+        root.addWidget(frame)
+
+        frame_layout = QtWidgets.QVBoxLayout(frame)
+        frame_layout.setContentsMargins(0, 0, 0, 0)
+        frame_layout.setSpacing(0)
+
+        video_host = QtWidgets.QWidget()
+        video_host.setStyleSheet("background: #0b1120;")
+        video_stack = QtWidgets.QStackedLayout(video_host)
+        video_stack.setContentsMargins(0, 0, 0, 0)
+        video_stack.setStackingMode(QtWidgets.QStackedLayout.StackAll)
+
+        self.video_widget = QtMultimediaWidgets.QVideoWidget()
+        self.video_widget.setStyleSheet("background: #0b1120;")
+        video_stack.addWidget(self.video_widget)
+
+        close_btn = QtWidgets.QPushButton("OK")
+        close_btn.setMinimumWidth(118)
+        close_btn.clicked.connect(self.accept)
+
+        bottom_bar = QtWidgets.QWidget()
+        bottom_bar.setFixedHeight(190)
+        bottom_bar.setStyleSheet("background: #000000;")
+        bottom_layout = QtWidgets.QHBoxLayout(bottom_bar)
+        bottom_layout.setContentsMargins(22, 16, 22, 16)
+        bottom_layout.setSpacing(16)
+
+        left_col = QtWidgets.QVBoxLayout()
+        left_col.setSpacing(8)
+
+        title = QtWidgets.QLabel(title_text)
+        title.setStyleSheet("color: white; font-size: 16pt; font-weight: 700;")
+        title.setWordWrap(True)
+
+        left_body = QtWidgets.QLabel(left_text)
+        left_body.setStyleSheet("color: #d7e6fb; font-size: 10.5pt;")
+        left_body.setWordWrap(True)
+        left_body.setAlignment(QtCore.Qt.AlignTop | QtCore.Qt.AlignLeft)
+
+        right_body = QtWidgets.QLabel(right_text)
+        right_body.setStyleSheet("color: #d7e6fb; font-size: 10.5pt;")
+        right_body.setWordWrap(True)
+        right_body.setAlignment(QtCore.Qt.AlignTop | QtCore.Qt.AlignLeft)
+
+        left_col.addWidget(title)
+        left_col.addWidget(left_body, 1)
+
+        right_col = QtWidgets.QVBoxLayout()
+        right_col.setSpacing(8)
+        right_col.addSpacing(34)
+        right_col.addWidget(right_body, 1)
+
+        columns = QtWidgets.QHBoxLayout()
+        columns.setSpacing(28)
+        columns.addLayout(left_col, 1)
+        columns.addLayout(right_col, 1)
+
+        bottom_layout.addLayout(columns, 1)
+        bottom_layout.addWidget(close_btn, 0, QtCore.Qt.AlignRight | QtCore.Qt.AlignBottom)
+
+        frame_layout.addWidget(video_host, 1)
+        frame_layout.addWidget(bottom_bar, 0)
+
+        self.audio_output = QtMultimedia.QAudioOutput(self)
+        self.audio_output.setMuted(True)
+        self.player = QtMultimedia.QMediaPlayer(self)
+        self.player.setAudioOutput(self.audio_output)
+        self.player.setVideoOutput(self.video_widget)
+        self.player.setLoops(QtMultimedia.QMediaPlayer.Loops.Infinite)
+
+        if os.path.exists(video_path):
+            self.player.setSource(QtCore.QUrl.fromLocalFile(video_path))
+
+    def showEvent(self, event: QtGui.QShowEvent) -> None:
+        super().showEvent(event)
+        if not self.player.source().isEmpty():
+            self.player.play()
+
+    def closeEvent(self, event: QtGui.QCloseEvent) -> None:
+        self.player.stop()
+        super().closeEvent(event)
 
 
 def thumb_cache_path(path: str) -> str:
@@ -588,7 +802,7 @@ class DarkPalette:
         }}
         QTreeView::item {{
             background: transparent;
-            padding: 2px 4px;
+            padding: 1px 4px;
         }}
         QTreeView::item:selected {{
             background: #2b3a55;
@@ -619,7 +833,7 @@ class DarkPalette:
         QListWidget::item {{
             background: transparent;
             border-radius: 6px;
-            padding: 6px 8px;
+            padding: 4px 8px;
             margin: 1px 0;
         }}
         QListWidget::item:selected {{
@@ -956,9 +1170,11 @@ class BaseTab(QtWidgets.QWidget):
         # --- LINKER PANEEL: Bibliotheken + Schijven + mapkeuze ---
         left = QtWidgets.QFrame()
         left.setProperty("class", "card")
+        left.setMinimumWidth(290)
+        left.setMaximumWidth(320)
         leftl = QtWidgets.QVBoxLayout(left)
-        leftl.setContentsMargins(12, 12, 12, 12)
-        leftl.setSpacing(10)
+        leftl.setContentsMargins(10, 10, 10, 10)
+        leftl.setSpacing(8)
 
         self.fs_model = QtWidgets.QFileSystemModel(self)
         self.fs_model.setRootPath("")
@@ -975,7 +1191,8 @@ class BaseTab(QtWidgets.QWidget):
 
         self.user_list = QtWidgets.QListWidget()
         self.user_list.setIconSize(QtCore.QSize(18, 18))
-        self.user_list.setSpacing(4)
+        self.user_list.setSpacing(2)
+        self.user_list.setVerticalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
         self.user_list.itemClicked.connect(self._on_library_item_selected)
         self.user_list.itemDoubleClicked.connect(self._on_library_item_selected)
         self._populate_pinned_libraries()
@@ -983,7 +1200,7 @@ class BaseTab(QtWidgets.QWidget):
         lib_frame = QtWidgets.QFrame()
         lib_frame.setProperty("class", "panel")
         lib_layout = QtWidgets.QVBoxLayout(lib_frame)
-        lib_layout.setContentsMargins(8, 8, 8, 8)
+        lib_layout.setContentsMargins(6, 6, 6, 6)
         lib_layout.setSpacing(0)
         lib_layout.addWidget(self.user_list)
         leftl.addWidget(lib_frame, 1)
@@ -1000,6 +1217,9 @@ class BaseTab(QtWidgets.QWidget):
         self.folder_tree.setAnimated(True)
         self.folder_tree.setUniformRowHeights(True)
         self.folder_tree.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.folder_tree.setVerticalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
+        self.folder_tree.header().setStretchLastSection(False)
+        self.folder_tree.header().setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeToContents)
         for c in range(1, 4):
             self.folder_tree.hideColumn(c)
         self.folder_tree.selectionModel().selectionChanged.connect(
@@ -1010,7 +1230,7 @@ class BaseTab(QtWidgets.QWidget):
         drive_frame = QtWidgets.QFrame()
         drive_frame.setProperty("class", "panel")
         drive_layout = QtWidgets.QVBoxLayout(drive_frame)
-        drive_layout.setContentsMargins(8, 8, 8, 8)
+        drive_layout.setContentsMargins(6, 6, 6, 6)
         drive_layout.setSpacing(0)
         drive_layout.addWidget(self.folder_tree)
         leftl.addWidget(drive_frame, 2)
@@ -1026,10 +1246,19 @@ class BaseTab(QtWidgets.QWidget):
         browse_btn.setFixedWidth(86)
         self.browse_btn = browse_btn
         row = QtWidgets.QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(8)
         row.addWidget(self.folder_line, 1)
         row.addWidget(browse_btn)
         leftl.addWidget(lbl_in)
-        leftl.addLayout(row)
+
+        selected_frame = QtWidgets.QFrame()
+        selected_frame.setProperty("class", "panel")
+        selected_layout = QtWidgets.QVBoxLayout(selected_frame)
+        selected_layout.setContentsMargins(6, 6, 6, 6)
+        selected_layout.setSpacing(0)
+        selected_layout.addLayout(row)
+        leftl.addWidget(selected_frame)
 
         # Opties + status
         self.cb_recurse = QtWidgets.QCheckBox("Submappen meenemen")
@@ -1118,6 +1347,7 @@ class BaseTab(QtWidgets.QWidget):
         hl.setVerticalSpacing(0)
         hl.addWidget(left, 0, 0)
         hl.addWidget(right, 0, 1)
+        hl.setColumnMinimumWidth(0, 290)
         hl.setColumnStretch(1, 1)
 
         # Signalen
@@ -1526,9 +1756,13 @@ class MainWindow(QtWidgets.QMainWindow):
         super().__init__()
         QtCore.QCoreApplication.setOrganizationName(ORG)
         QtCore.QCoreApplication.setApplicationName(APP_SETTINGS_NAME)
+        self._icon_path = resource_path("icon.ico")
+        self._background_path = resource_path("BG.png")
 
         self.setWindowTitle(APP_NAME)
         self.resize(1400, 820)
+        if os.path.exists(self._icon_path):
+            self.setWindowIcon(QtGui.QIcon(self._icon_path))
         self._settings = QtCore.QSettings(ORG, APP_SETTINGS_NAME)
         self._language_options = load_language_options()
         self._language_actions: Dict[str, QtGui.QAction] = {}
@@ -1549,8 +1783,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.act_recurse_video.setCheckable(True)
         self.act_recurse_photo = QtGui.QAction("Foto: submappen standaard meenemen", self)
         self.act_recurse_photo.setCheckable(True)
+        self.act_play_intro = QtGui.QAction("Intro afspelen bij opstarten", self)
+        self.act_play_intro.setCheckable(True)
         m_settings.addAction(self.act_recurse_video)
         m_settings.addAction(self.act_recurse_photo)
+        m_settings.addAction(self.act_play_intro)
         m_settings.addSeparator()
         self.language_menu = m_settings.addMenu("Taal")
         self.language_group = QtGui.QActionGroup(self)
@@ -1570,7 +1807,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.m_help = m_help
         act_about = QtGui.QAction("Info / Over", self)
         self.act_about = act_about
-        act_about.triggered.connect(self.show_about_dialog)
+        act_about.triggered.connect(self.show_about_video_dialog)
         m_help.addAction(act_about)
         act_scripts = QtGui.QAction("Scripts en modules", self)
         self.act_scripts = act_scripts
@@ -1578,14 +1815,37 @@ class MainWindow(QtWidgets.QMainWindow):
         m_help.addAction(act_scripts)
 
         header = QtWidgets.QFrame()
-        header.setFixedHeight(56)
-        header.setStyleSheet("background: qlineargradient(x1:0,y1:0,x2:1,y2:0, stop:0 #050814, stop:0.4 #10172b, stop:1 #172237);")
+        header.setFixedHeight(72)
+        header.setStyleSheet(
+            "background: #111827;"
+            "border: none;"
+        )
         hhl = QtWidgets.QHBoxLayout(header)
-        hhl.setContentsMargins(12, 0, 12, 0)
-        title = QtWidgets.QLabel(f"{APP_NAME}  •  Video- en fotodubbelen")
-        title.setStyleSheet("color:white; font-weight:700; font-size:16px;")
-        self.title = title
-        hhl.addWidget(title)
+        hhl.setContentsMargins(18, 6, 18, 6)
+        hhl.setSpacing(16)
+
+        self.header_icon = QtWidgets.QLabel()
+        header_pixmap = QtGui.QPixmap(resource_path("logo_flat.png"))
+        if not header_pixmap.isNull():
+            scaled = header_pixmap.scaledToHeight(
+                header.height() - 8,
+                QtCore.Qt.SmoothTransformation,
+            )
+            self.header_icon.setPixmap(scaled)
+            self.header_icon.setFixedSize(scaled.size())
+        self.header_icon.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+        hhl.addWidget(self.header_icon, 0, QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+        self.title = QtWidgets.QLabel(APP_NAME)
+        self.title.setStyleSheet(
+            "color: #f2f7ff;"
+            "font-family: 'Aptos', 'Segoe UI', 'Arial', sans-serif;"
+            "font-size: 29px;"
+            "font-weight: 400;"
+            "letter-spacing: 0px;"
+            "background: transparent;"
+        )
+        self.title.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+        hhl.addWidget(self.title, 0, QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
         hhl.addStretch(1)
 
         self.tabs = QtWidgets.QTabWidget()
@@ -1604,7 +1864,7 @@ class MainWindow(QtWidgets.QMainWindow):
         fl.addWidget(self.footer_lbl)
         fl.addStretch(1)
 
-        central = QtWidgets.QWidget()
+        central = WatermarkWidget(self._background_path)
         v = QtWidgets.QVBoxLayout(central)
         v.setContentsMargins(12, 8, 12, 8)
         v.setSpacing(8)
@@ -1615,8 +1875,12 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.act_recurse_video.setChecked(self._settings.value("recurse_default_video", True, type=bool))
         self.act_recurse_photo.setChecked(self._settings.value("recurse_default_photo", True, type=bool))
+        self.act_play_intro.setChecked(self._settings.value(SET_KEY_PLAY_INTRO, True, type=bool))
         self.act_recurse_video.toggled.connect(self.video_tab.save_recurse_default)
         self.act_recurse_photo.toggled.connect(self.photo_tab.save_recurse_default)
+        self.act_play_intro.toggled.connect(
+            lambda checked: self._settings.setValue(SET_KEY_PLAY_INTRO, bool(checked))
+        )
         self.set_ui_language(self._current_language_code, persist=False)
 
         self.setStyleSheet(DarkPalette.stylesheet())
@@ -1662,27 +1926,14 @@ class MainWindow(QtWidgets.QMainWindow):
         self.act_recurse_photo.setText(
             self.tr_text("action_recurse_photo", "Foto: submappen standaard meenemen")
         )
-        self.title.setText(
-            f"{APP_NAME}  •  {self.tr_text('app_title_suffix', 'Video- en fotodubbelen')}"
+        self.act_play_intro.setText(
+            self.tr_text("action_play_intro", "Intro afspelen bij opstarten")
         )
         self.tabs.setTabText(0, self.tr_text("tab_video", "Video-dubbelen"))
         self.tabs.setTabText(1, self.tr_text("tab_photo", "Foto-dubbelen"))
         self.video_tab.apply_translations()
         self.photo_tab.apply_translations()
         self.on_tab_changed(self.tabs.currentIndex() if hasattr(self, "tabs") else 0)
-
-    def show_about_dialog(self):
-        QtWidgets.QMessageBox.about(
-            self,
-            "Info / Over",
-            (
-                f"{APP_NAME}\n\n"
-                f"{self.tr_text('about_body', 'Media-audit voor video- en fotodubbelen.\\nExport en prullenbak-ondersteuning aanwezig.')}\n\n"
-                f"{self.tr_text('about_language', 'Gekozen taal')}:\n  {self.current_language_label()}\n\n"
-                f"{self.tr_text('about_author', 'Auteur / GitHub')}:\n"
-                "  RymndA"
-            ),
-        )
 
     def show_scripts_dialog(self):
         text = (
@@ -1701,6 +1952,28 @@ class MainWindow(QtWidgets.QMainWindow):
             text,
         )
 
+    def show_about_video_dialog(self):
+        left_text = (
+            "Media audit for video and photo duplicates.\n"
+            "Export and recycle bin support available.\n\n"
+            f"Selected language:\n{self.current_language_label()}"
+        )
+        right_text = (
+            "Author / GitHub:\n"
+            "RymndA\n\n"
+            "Release:\n"
+            "2026-April"
+        )
+        dialog = AboutVideoDialog(
+            resource_path("Intro_about.mp4"),
+            self._icon_path,
+            APP_NAME,
+            left_text,
+            right_text,
+            self,
+        )
+        dialog.exec()
+
     def closeEvent(self, e: QtGui.QCloseEvent) -> None:
         try:
             self.video_tab.abort_worker()
@@ -1716,6 +1989,16 @@ def main():
     QtCore.QCoreApplication.setOrganizationName(ORG)
     QtCore.QCoreApplication.setApplicationName(APP_SETTINGS_NAME)
     app = QtWidgets.QApplication(sys.argv)
+    icon_path = resource_path("icon.ico")
+    if os.path.exists(icon_path):
+        app.setWindowIcon(QtGui.QIcon(icon_path))
+
+    settings = QtCore.QSettings(ORG, APP_SETTINGS_NAME)
+    intro_path = resource_path("intro.mp4")
+    if settings.value(SET_KEY_PLAY_INTRO, True, type=bool) and os.path.exists(intro_path):
+        intro = IntroDialog(intro_path, icon_path)
+        intro.exec()
+
     w = MainWindow()
     w.show()
     sys.exit(app.exec())

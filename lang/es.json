@@ -9,6 +9,7 @@
   "action_scripts": "Scripts y módulos",
   "action_recurse_video": "Video: incluir subcarpetas por defecto",
   "action_recurse_photo": "Foto: incluir subcarpetas por defecto",
+  "action_play_intro": "Reproducir intro al iniciar",
   "tab_video": "Duplicados de video",
   "tab_photo": "Duplicados de fotos",
   "footer_ready": "Listo",
