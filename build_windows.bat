@@ -19,5 +19,5 @@ pyinstaller ^
   MediaDuplicatieFinder.py
 
 echo.
-echo Build klaar. Zie dist\MediaDuplicatieFinder\
+echo Build complete. See dist\MediaDuplicatieFinder\
 endlocal

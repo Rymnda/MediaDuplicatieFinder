@@ -1,43 +1,43 @@
 # Media Duplicatie Finder
 
-Desktop-app voor het vinden van dubbele video's en foto's op Windows.
+Desktop app for finding duplicate videos and photos on Windows.
 
-## Functies
+## Features
 
-- dubbele video's vinden via thumbnail/perceptual hash en duurvergelijking
-- dubbele foto's vinden via perceptual hash
-- bibliotheken en schijven links in de interface
-- selectieacties voor groepen
-- export van selectie naar TXT
-- verwijderen naar de Windows-prullenbak
-- taalkeuze via `lang/*.json`
+- find duplicate videos using thumbnail/perceptual hash and duration comparison
+- find duplicate photos using perceptual hash
+- libraries and drives panel on the left side of the interface
+- selection actions for duplicate groups
+- export selection to TXT
+- delete selected files to the Windows Recycle Bin
+- language selection via `lang/*.json`
 
-## Vereisten
+## Requirements
 
 - Python 3.10+
 - Windows
-- `ffmpeg` en `ffprobe` in `PATH` of op `C:\Program Files\FFMPEG\bin\`
+- `ffmpeg` and `ffprobe` in `PATH` or at `C:\Program Files\FFMPEG\bin\`
 
-## Installeren
+## Installation
 
 ```powershell
 pip install -r requirements.txt
 python .\MediaDuplicatieFinder.py
 ```
 
-## Build naar exe
+## Build to EXE
 
-Lokale build:
+Local build:
 
 ```powershell
 .\build_windows.bat
 ```
 
-De build komt daarna in `dist\MediaDuplicatieFinder\`.
+The build output will be placed in `dist\MediaDuplicatieFinder\`.
 
-## GitHub upload
+## GitHub Repository Contents
 
-Aanbevolen bestanden voor de repository:
+Recommended files for the repository:
 
 - `MediaDuplicatieFinder.py`
 - `requirements.txt`
@@ -51,13 +51,13 @@ Aanbevolen bestanden voor de repository:
 
 ## GitHub Actions
 
-Na pushen naar GitHub bouwt de workflow automatisch een Windows artifact met PyInstaller.
+After pushing to GitHub, the workflow automatically builds a Windows artifact with PyInstaller.
 
-## Opmerkingen
+## Notes
 
-- Kies nog zelf een licentie en voeg daarna bijvoorbeeld een `LICENSE`-bestand toe.
-- Als je ook een installer wilt publiceren, kun je later Inno Setup toevoegen.
+- A license file is already included in this repository.
+- If you also want to publish an installer, you can add Inno Setup later.
 
-## Auteur
+## Author
 
 RymndA
