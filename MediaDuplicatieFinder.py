@@ -959,6 +959,70 @@ class ThumbCard(QtWidgets.QFrame):
         QtGui.QDesktopServices.openUrl(QtCore.QUrl.fromLocalFile(self.vm.path))
 
 
+class DetailRow(QtWidgets.QFrame):
+    def __init__(self, vm: VidMeta, is_best: bool):
+        super().__init__()
+        self.vm = vm
+        self.setProperty("class", "card")
+
+        layout = QtWidgets.QGridLayout(self)
+        layout.setContentsMargins(10, 8, 10, 8)
+        layout.setHorizontalSpacing(10)
+        layout.setVerticalSpacing(4)
+
+        self.chk = QtWidgets.QCheckBox()
+
+        best_lbl = QtWidgets.QLabel("Beste" if is_best else "")
+        best_lbl.setStyleSheet("color:#8FD3FE;font-weight:600;")
+
+        name_lbl = QtWidgets.QLabel(vm.name)
+        name_lbl.setStyleSheet("font-weight:600;")
+        name_lbl.setWordWrap(True)
+
+        if vm.is_video:
+            meta_text = (
+                f"{vm.w}x{vm.h} | {human_size(vm.size)} | {vm.dur:.1f}s | "
+                f"Q={vm.quality:.2f}"
+            )
+        else:
+            meta_text = f"{vm.w}x{vm.h} | {human_size(vm.size)} | Q={vm.quality:.2f}"
+
+        meta_lbl = QtWidgets.QLabel(meta_text)
+        meta_lbl.setProperty("class", "hint")
+
+        path_lbl = QtWidgets.QLabel(vm.path)
+        path_lbl.setProperty("class", "hint")
+        path_lbl.setWordWrap(True)
+
+        btn_open = QtWidgets.QPushButton("Open bestand")
+        btn_open.clicked.connect(self.open_file)
+        btn_folder = QtWidgets.QPushButton("Open map")
+        btn_folder.clicked.connect(self.open_folder)
+
+        btns = QtWidgets.QHBoxLayout()
+        btns.setContentsMargins(0, 0, 0, 0)
+        btns.setSpacing(8)
+        btns.addWidget(btn_open)
+        btns.addWidget(btn_folder)
+        btns.addStretch(1)
+
+        layout.addWidget(self.chk, 0, 0, 2, 1, QtCore.Qt.AlignTop)
+        layout.addWidget(best_lbl, 0, 1, 1, 1, QtCore.Qt.AlignTop)
+        layout.addWidget(name_lbl, 0, 2, 1, 1)
+        layout.addWidget(meta_lbl, 1, 2, 1, 1)
+        layout.addWidget(path_lbl, 2, 1, 1, 2)
+        layout.addLayout(btns, 3, 1, 1, 2)
+        layout.setColumnStretch(2, 1)
+
+    def open_folder(self):
+        QtGui.QDesktopServices.openUrl(
+            QtCore.QUrl.fromLocalFile(os.path.dirname(self.vm.path))
+        )
+
+    def open_file(self):
+        QtGui.QDesktopServices.openUrl(QtCore.QUrl.fromLocalFile(self.vm.path))
+
+
 class GroupRow(QtWidgets.QFrame):
     def __init__(self, items: List[VidMeta], is_photo: bool = False):
         super().__init__()
@@ -966,6 +1030,7 @@ class GroupRow(QtWidgets.QFrame):
         self.is_photo = is_photo
         self.setProperty("class", "card")
         self.cards: List[ThumbCard] = []
+        self.detail_rows: List[DetailRow] = []
 
         v = QtWidgets.QVBoxLayout(self)
         v.setContentsMargins(10, 10, 10, 10)
@@ -991,14 +1056,49 @@ class GroupRow(QtWidgets.QFrame):
 
         v.addLayout(head)
 
-        row = QtWidgets.QHBoxLayout()
+        self.views = QtWidgets.QStackedWidget()
+
+        thumb_page = QtWidgets.QWidget()
+        row = QtWidgets.QHBoxLayout(thumb_page)
+        row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(8)
         for m in items:
             c = ThumbCard(m)
             self.cards.append(c)
             row.addWidget(c)
         row.addStretch(1)
-        v.addLayout(row)
+        self.views.addWidget(thumb_page)
+
+        details_page = QtWidgets.QWidget()
+        details_layout = QtWidgets.QVBoxLayout(details_page)
+        details_layout.setContentsMargins(0, 0, 0, 0)
+        details_layout.setSpacing(8)
+        for i, m in enumerate(items):
+            detail = DetailRow(m, is_best=(i == 0))
+            self.detail_rows.append(detail)
+            details_layout.addWidget(detail)
+        details_layout.addStretch(1)
+        self.views.addWidget(details_page)
+
+        for card, detail in zip(self.cards, self.detail_rows):
+            card.chk.toggled.connect(
+                lambda checked, peer=detail.chk: self._sync_checkbox(peer, checked)
+            )
+            detail.chk.toggled.connect(
+                lambda checked, peer=card.chk: self._sync_checkbox(peer, checked)
+            )
+
+        v.addWidget(self.views)
+
+    def _sync_checkbox(self, checkbox: QtWidgets.QCheckBox, checked: bool):
+        if checkbox.isChecked() == checked:
+            return
+        blocker = QtCore.QSignalBlocker(checkbox)
+        checkbox.setChecked(checked)
+        del blocker
+
+    def set_view_mode(self, mode: str):
+        self.views.setCurrentIndex(0 if mode == "thumbnails" else 1)
 
     def selected_paths(self) -> List[str]:
         return [c.vm.path for c in self.cards if c.chk.isChecked()]
@@ -1167,6 +1267,7 @@ class BaseTab(QtWidgets.QWidget):
         self._thread: Optional[QtCore.QThread] = None
         self._worker: Optional[QtCore.QObject] = None
         self._main_window = parent if isinstance(parent, MainWindow) else None
+        self._result_view_mode = "thumbnails"
         # --- LINKER PANEEL: Bibliotheken + Schijven + mapkeuze ---
         left = QtWidgets.QFrame()
         left.setProperty("class", "card")
@@ -1296,7 +1397,13 @@ class BaseTab(QtWidgets.QWidget):
 
         self.progress = QtWidgets.QProgressBar()
 
+        self.view_mode_combo = QtWidgets.QComboBox()
+        self.view_mode_combo.addItem("Miniaturen", "thumbnails")
+        self.view_mode_combo.addItem("Lijst details", "details")
+        self.view_mode_combo.currentIndexChanged.connect(self.on_view_mode_changed)
+
         btn_row = QtWidgets.QHBoxLayout()
+        btn_row.addWidget(self.view_mode_combo)
         self.btn_select_all = QtWidgets.QPushButton("Selecteer alles")
         self.btn_select_all.clicked.connect(self.select_all)
         self.btn_select_none = QtWidgets.QPushButton("Deselecteer alles")
@@ -1400,6 +1507,8 @@ class BaseTab(QtWidgets.QWidget):
         self.btn_global_move.setText(
             self.tr_text("button_keep_best", "Beste houden per groep")
         )
+        self.view_mode_combo.setItemText(0, "Miniaturen")
+        self.view_mode_combo.setItemText(1, "Lijst details")
 
 
     def restore_settings(self):
@@ -1535,9 +1644,12 @@ class BaseTab(QtWidgets.QWidget):
         self.setStatus(f"Gevonden groepen {label}: {len(groups)} (≥2)")
         for g in groups:
             row = GroupRow(g, is_photo=self.is_photo)
+            row.set_view_mode(self._result_view_mode)
             self._attach_context_menu(row)
             for card in row.cards:
                 self._attach_context_menu(card)
+            for detail in row.detail_rows:
+                self._attach_context_menu(detail)
             self.vbox.insertWidget(self.vbox.count() - 1, row)
         if not groups:
             QtWidgets.QMessageBox.information(self, "Resultaat", f"Geen {label} gevonden.")
@@ -1547,6 +1659,11 @@ class BaseTab(QtWidgets.QWidget):
             w = self.vbox.itemAt(i).widget()
             if isinstance(w, GroupRow):
                 yield w
+
+    def on_view_mode_changed(self, _index: int):
+        self._result_view_mode = self.view_mode_combo.currentData()
+        for row in self._iter_group_rows():
+            row.set_view_mode(self._result_view_mode)
 
     def select_all(self):
         for w in self._iter_group_rows():
@@ -1641,6 +1758,9 @@ class BaseTab(QtWidgets.QWidget):
 
     def open_results_context_menu(self, pos: QtCore.QPoint):
         menu = QtWidgets.QMenu(self)
+        act_view_thumbs = menu.addAction("Weergave: Miniaturen")
+        act_view_details = menu.addAction("Weergave: Lijst details")
+        menu.addSeparator()
         act_select_all = menu.addAction("Selecteer alles")
         act_select_none = menu.addAction("Deselecteer alles")
         act_invert = menu.addAction("Draai selectie om")
@@ -1655,7 +1775,11 @@ class BaseTab(QtWidgets.QWidget):
         act_undo.setEnabled(False)
 
         chosen = menu.exec(self.scroll.viewport().mapToGlobal(pos))
-        if chosen == act_select_all:
+        if chosen == act_view_thumbs:
+            self.view_mode_combo.setCurrentIndex(0)
+        elif chosen == act_view_details:
+            self.view_mode_combo.setCurrentIndex(1)
+        elif chosen == act_select_all:
             self.select_all()
         elif chosen == act_select_none:
             self.deselect_all()
