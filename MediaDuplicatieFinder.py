@@ -1271,8 +1271,11 @@ class BaseTab(QtWidgets.QWidget):
         # --- LINKER PANEEL: Bibliotheken + Schijven + mapkeuze ---
         left = QtWidgets.QFrame()
         left.setProperty("class", "card")
-        left.setMinimumWidth(290)
-        left.setMaximumWidth(320)
+        left.setMinimumWidth(240)
+        left.setSizePolicy(
+            QtWidgets.QSizePolicy.Preferred,
+            QtWidgets.QSizePolicy.Expanding,
+        )
         leftl = QtWidgets.QVBoxLayout(left)
         leftl.setContentsMargins(10, 10, 10, 10)
         leftl.setSpacing(8)
@@ -1379,6 +1382,11 @@ class BaseTab(QtWidgets.QWidget):
         # --- RECHTER PANEEL: groepen met thumbnails, progress, knoppen ---
         right = QtWidgets.QFrame()
         right.setProperty("class", "card")
+        right.setMinimumWidth(420)
+        right.setSizePolicy(
+            QtWidgets.QSizePolicy.Expanding,
+            QtWidgets.QSizePolicy.Expanding,
+        )
         rightl = QtWidgets.QVBoxLayout(right)
         rightl.setContentsMargins(12, 12, 12, 12)
         rightl.setSpacing(10)
@@ -1448,14 +1456,18 @@ class BaseTab(QtWidgets.QWidget):
         rightl.addLayout(btn_row)
 
         # --- Hoofd layout voor tab ---
-        hl = QtWidgets.QGridLayout(self)
+        self.main_splitter = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
+        self.main_splitter.setChildrenCollapsible(False)
+        self.main_splitter.addWidget(left)
+        self.main_splitter.addWidget(right)
+        self.main_splitter.setStretchFactor(0, 0)
+        self.main_splitter.setStretchFactor(1, 1)
+        self.main_splitter.setSizes([280, 1120])
+
+        hl = QtWidgets.QVBoxLayout(self)
         hl.setContentsMargins(0, 0, 0, 0)
-        hl.setHorizontalSpacing(12)
-        hl.setVerticalSpacing(0)
-        hl.addWidget(left, 0, 0)
-        hl.addWidget(right, 0, 1)
-        hl.setColumnMinimumWidth(0, 290)
-        hl.setColumnStretch(1, 1)
+        hl.setSpacing(0)
+        hl.addWidget(self.main_splitter, 1)
 
         # Signalen
         browse_btn.clicked.connect(self.pick_folder)
@@ -1876,6 +1888,21 @@ class PhotoTab(BaseTab):
 
 
 class MainWindow(QtWidgets.QMainWindow):
+    def _update_header_icon(self):
+        if not hasattr(self, "header_icon"):
+            return
+        header_pixmap = QtGui.QPixmap(resource_path("logo_flat.png"))
+        if header_pixmap.isNull():
+            self.header_icon.clear()
+            return
+        target_h = max(32, self.header.height() - 12)
+        scaled = header_pixmap.scaledToHeight(
+            target_h,
+            QtCore.Qt.SmoothTransformation,
+        )
+        self.header_icon.setPixmap(scaled)
+        self.header_icon.setFixedSize(scaled.size())
+
     def __init__(self):
         super().__init__()
         QtCore.QCoreApplication.setOrganizationName(ORG)
@@ -1885,6 +1912,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.setWindowTitle(APP_NAME)
         self.resize(1400, 820)
+        self.setMinimumSize(960, 620)
         if os.path.exists(self._icon_path):
             self.setWindowIcon(QtGui.QIcon(self._icon_path))
         self._settings = QtCore.QSettings(ORG, APP_SETTINGS_NAME)
@@ -1939,24 +1967,22 @@ class MainWindow(QtWidgets.QMainWindow):
         m_help.addAction(act_scripts)
 
         header = QtWidgets.QFrame()
-        header.setFixedHeight(72)
+        header.setMinimumHeight(64)
+        header.setMaximumHeight(110)
+        header.setSizePolicy(
+            QtWidgets.QSizePolicy.Preferred,
+            QtWidgets.QSizePolicy.Fixed,
+        )
         header.setStyleSheet(
             "background: #111827;"
             "border: none;"
         )
+        self.header = header
         hhl = QtWidgets.QHBoxLayout(header)
         hhl.setContentsMargins(18, 6, 18, 6)
         hhl.setSpacing(16)
 
         self.header_icon = QtWidgets.QLabel()
-        header_pixmap = QtGui.QPixmap(resource_path("logo_flat.png"))
-        if not header_pixmap.isNull():
-            scaled = header_pixmap.scaledToHeight(
-                header.height() - 8,
-                QtCore.Qt.SmoothTransformation,
-            )
-            self.header_icon.setPixmap(scaled)
-            self.header_icon.setFixedSize(scaled.size())
         self.header_icon.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
         hhl.addWidget(self.header_icon, 0, QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
         self.title = QtWidgets.QLabel(APP_NAME)
@@ -1971,6 +1997,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.title.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
         hhl.addWidget(self.title, 0, QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
         hhl.addStretch(1)
+        self._update_header_icon()
 
         self.tabs = QtWidgets.QTabWidget()
         self.video_tab = VideoTab(self._settings, self)
@@ -1979,7 +2006,12 @@ class MainWindow(QtWidgets.QMainWindow):
         self.tabs.addTab(self.photo_tab, "Foto-dubbelen")
 
         footer = QtWidgets.QFrame()
-        footer.setFixedHeight(30)
+        footer.setMinimumHeight(28)
+        footer.setMaximumHeight(40)
+        footer.setSizePolicy(
+            QtWidgets.QSizePolicy.Preferred,
+            QtWidgets.QSizePolicy.Fixed,
+        )
         footer.setStyleSheet("background:#101722;border-top:1px solid #0d1421;")
         fl = QtWidgets.QHBoxLayout(footer)
         fl.setContentsMargins(12, 0, 12, 0)
@@ -2011,6 +2043,10 @@ class MainWindow(QtWidgets.QMainWindow):
         geom = self._settings.value("main/geometry")
         if geom is not None: self.restoreGeometry(geom)
         self.tabs.currentChanged.connect(self.on_tab_changed)
+
+    def resizeEvent(self, event: QtGui.QResizeEvent) -> None:
+        super().resizeEvent(event)
+        self._update_header_icon()
 
     def on_tab_changed(self, idx: int):
         base = self.tr_text("tab_video", "Video-dubbelen") if idx == 0 else self.tr_text("tab_photo", "Foto-dubbelen")
