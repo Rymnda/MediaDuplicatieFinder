@@ -27,10 +27,12 @@ python .\MediaDuplicatieFinder.py
 
 ## Build to EXE
 
-Local build:
+Use the GitHub Actions workflow or run PyInstaller manually:
 
 ```powershell
-.\build_windows.bat
+python -m pip install -r requirements.txt
+python -m pip install pyinstaller
+pyinstaller --noconfirm --windowed --name "MediaDuplicatieFinder" --add-data "check_white.svg;." --add-data "lang;lang" MediaDuplicatieFinder.py
 ```
 
 The build output will be placed in `dist\MediaDuplicatieFinder\`.
@@ -44,10 +46,8 @@ Recommended files for the repository:
 - `README.md`
 - `.gitignore`
 - `check_white.svg`
-- `check_white2.svg`
 - `lang/`
 - `.github/workflows/build-windows.yml`
-- `build_windows.bat`
 
 ## GitHub Actions
 

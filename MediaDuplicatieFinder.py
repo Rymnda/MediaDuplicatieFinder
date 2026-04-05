@@ -441,12 +441,7 @@ class DarkPalette:
     @staticmethod
     def stylesheet() -> str:
         base_dir = os.path.dirname(os.path.abspath(__file__))
-        check_svg_path = ""
-        for candidate in ("check_white.svg", "check_white2.svg"):
-            candidate_path = os.path.join(base_dir, candidate)
-            if os.path.exists(candidate_path):
-                check_svg_path = candidate_path
-                break
+        check_svg_path = os.path.join(base_dir, "check_white.svg")
 
         if not os.path.exists(check_svg_path):
             svg_data = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">

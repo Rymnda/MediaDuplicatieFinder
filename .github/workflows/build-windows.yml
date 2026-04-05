@@ -28,7 +28,7 @@ jobs:
 
       - name: Build EXE
         run: |
-          pyinstaller --noconfirm --windowed --name "MediaDuplicatieFinder" --add-data "check_white.svg;." --add-data "check_white2.svg;." --add-data "lang;lang" MediaDuplicatieFinder.py
+          pyinstaller --noconfirm --windowed --name "MediaDuplicatieFinder" --add-data "check_white.svg;." --add-data "lang;lang" MediaDuplicatieFinder.py
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
